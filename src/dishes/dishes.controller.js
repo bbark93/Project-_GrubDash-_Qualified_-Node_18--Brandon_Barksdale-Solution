@@ -28,7 +28,11 @@ function bodyDataHas(propertyName) {
 
     // Validate price
     if (propertyName === "price") {
-      if (value === undefined || value <= 0) {
+      if (
+        value === undefined ||
+        typeof value !== "number" ||
+        value <= 0
+      ) {
         return next({
           status: 400,
           message: "Must include a price greater than 0",
@@ -36,13 +40,14 @@ function bodyDataHas(propertyName) {
       }
     }
 
-    return next();
+    next();
   };
 }
 
 function create(req, res) {
   const { data: { name, description, price, image_url } = {} } = req.body;
-  const newId = nextId;
+  const newId = nextId();
+  console.log(newId);
   const newDish = {
     id: newId,
     name: name,
@@ -55,23 +60,50 @@ function create(req, res) {
   res.status(201).json({ data: newDish });
 }
 
-// function dishExists(req, res, next) {
-//     const { dishId } = req.params;
-//     const foundDish = dishes.find((dish) => dish.id === Number(dishId));
+function dishExists(req, res, next) {
+  const { dishId } = req.params;
+  const foundDish = dishes.find((dish) => dish.id === dishId);
 
-//     if (foundDish) {
-//         res.locals.dish = foundDish;
-//         return next();
-//     }
-//     next({
-//         status: 404,
-//         message: `Dish does not exist: ${dishId}.`
-//     })
-// }
+  if (foundDish) {
+    res.locals.dish = foundDish;
+    return next();
+  }
+  next({
+    status: 404,
+    message: `Dish does not exist: ${dishId}.`,
+  });
+}
 
-// function read(req, res, next) {
-//   res.json({ data: res.locals.dish });
-// };
+function read(req, res, next) {
+  res.json({ data: res.locals.dish });
+}
+
+function idMatchesRoute(req, res, next) {
+  const { dishId } = req.params;
+  const { data = {} } = req.body;
+  const { id } = data;
+
+  if (id && id !== dishId) {
+    return next({
+      status: 400,
+      message: `Dish id does not match route id. Dish: ${id}, Route: ${dishId}`,
+    });
+  }
+
+  next();
+}
+
+function update(req, res) {
+  const dish = res.locals.dish;
+  const { data: { name, description, price, image_url } = {} } = req.body;
+
+  dish.name = name;
+  dish.description = description;
+  dish.price = price;
+  dish.image_url = image_url;
+
+  res.json({ data: dish });
+}
 
 module.exports = {
   list,
@@ -82,5 +114,14 @@ module.exports = {
     bodyDataHas("image_url"),
     create,
   ],
-  //read: [dishExists, read],
+  read: [dishExists, read],
+  update: [
+    dishExists,
+    idMatchesRoute,
+    bodyDataHas("name"),
+    bodyDataHas("description"),
+    bodyDataHas("price"),
+    bodyDataHas("image_url"),
+    update,
+  ],
 };
