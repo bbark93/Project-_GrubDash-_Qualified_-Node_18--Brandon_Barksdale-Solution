@@ -66,6 +66,24 @@ function create(req, res) {
   res.status(201).json({ data: newOrder });
 }
 
+function orderExist(req, res, next) {
+    const { orderId } = req.params;
+    const foundOrder = orders.find((order) => order.id === orderId);
+
+    if (foundOrder) {
+        res.locals.order = foundOrder;
+        return next();
+    }
+    next({
+        status: 404,
+        message: `Order does not exist: ${orderId}.`
+    })
+}
+
+function read(req, res, next) {
+    res.json({ data: res.locals.order })
+}
+
 module.exports = {
   list,
   create: [
@@ -75,4 +93,5 @@ module.exports = {
     dishesIsValid,
     create,
   ],
+  read: [orderExist, read],
 };
