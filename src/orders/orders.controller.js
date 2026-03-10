@@ -14,6 +14,7 @@ function list(req, res) {
 function bodyDataHas(propertyName) {
   return function (req, res, next) {
     const { data = {} } = req.body;
+
     if (data[propertyName]) {
       return next();
     }
@@ -67,21 +68,77 @@ function create(req, res) {
 }
 
 function orderExist(req, res, next) {
-    const { orderId } = req.params;
-    const foundOrder = orders.find((order) => order.id === orderId);
+  const { orderId } = req.params;
+  const foundOrder = orders.find((order) => order.id === orderId);
 
-    if (foundOrder) {
-        res.locals.order = foundOrder;
-        return next();
-    }
-    next({
-        status: 404,
-        message: `Order does not exist: ${orderId}.`
-    })
+  if (foundOrder) {
+    res.locals.order = foundOrder;
+    return next();
+  }
+  next({
+    status: 404,
+    message: `Order does not exist: ${orderId}.`,
+  });
 }
 
 function read(req, res, next) {
-    res.json({ data: res.locals.order })
+  res.json({ data: res.locals.order });
+}
+
+function idMatchesRoute(req, res, next) {
+  const { orderId } = req.params;
+  const { data = {} } = req.body;
+  const { id } = data;
+
+  if (id && id !== orderId) {
+    return next({
+      status: 400,
+      message: `Order id does not match route id. Order: ${id}, Route: ${orderId}.`,
+    });
+  }
+  next();
+}
+
+function statusIsValid(req, res, next) {
+  const { data: { status } = {} } = req.body;
+
+  if (
+    !["pending", "preparing", "out-for-delivery", "delivered"].includes(status)
+  ) {
+    return next({ status: 400, message: "Order must have a valid status" });
+  }
+
+  next();
+}
+
+function update(req, res) {
+  const order = res.locals.order;
+  const { data: { deliverTo, mobileNumber, status, dishes } = {} } = req.body;
+
+  order.deliverTo = deliverTo;
+  order.mobileNumber = mobileNumber;
+  order.status = status;
+  order.dishes = dishes;
+
+  res.json({ data: order });
+}
+
+function canDelete(req, res, next) {
+    const { data: { status } = {} } = req.body;
+
+    if (status !== "pending") {
+        return next({
+            status: 400,
+            message: "An order cannot be deleted unless it is pending."
+        })
+    }
+    next();
+}
+
+function destroy(req, res) {
+    const index = res.locals.order.id;
+    const deletedOrder = orders.splice(index, 1);
+    res.sendStatus(204); 
 }
 
 module.exports = {
@@ -94,4 +151,16 @@ module.exports = {
     create,
   ],
   read: [orderExist, read],
+  update: [
+    orderExist,
+    idMatchesRoute,
+    bodyDataHas("deliverTo"),
+    bodyDataHas("mobileNumber"),
+    bodyDataHas("status"),
+    statusIsValid,
+    bodyDataHas("dishes"),
+    dishesIsValid,
+    update,
+  ],
+  //destroy: [orderExist, canDelete, destroy]
 };
