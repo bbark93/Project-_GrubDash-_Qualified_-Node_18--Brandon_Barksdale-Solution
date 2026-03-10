@@ -124,21 +124,26 @@ function update(req, res) {
 }
 
 function canDelete(req, res, next) {
-    const { data: { status } = {} } = req.body;
+  const { status } = res.locals.order;
 
-    if (status !== "pending") {
-        return next({
-            status: 400,
-            message: "An order cannot be deleted unless it is pending."
-        })
-    }
-    next();
+  if (status !== "pending") {
+    return next({
+      status: 400,
+      message: "An order cannot be deleted unless it is pending.",
+    });
+  }
+
+  next();
 }
 
 function destroy(req, res) {
-    const index = res.locals.order.id;
-    const deletedOrder = orders.splice(index, 1);
-    res.sendStatus(204); 
+  const order = res.locals.order;
+
+  const index = orders.findIndex((orderItem) => orderItem.id === order.id);
+
+  orders.splice(index, 1);
+
+  res.sendStatus(204);
 }
 
 module.exports = {
@@ -162,5 +167,5 @@ module.exports = {
     dishesIsValid,
     update,
   ],
-  //destroy: [orderExist, canDelete, destroy]
+  delete: [orderExist, canDelete, destroy]
 };
